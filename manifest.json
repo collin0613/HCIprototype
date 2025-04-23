@@ -1,0 +1,21 @@
+{
+    "manifest_version": "1",
+    "name": "HCIprototype",
+    "author": "Vincent Cancelliere",
+    "version": "0.1.0",
+    "description": "Injects a student-centered GUI overlay into Outlook, providing customizable filters, priority inbox, and simplified navigation to streamline email management.",
+    "browser_action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "images/HCIprototype.png",
+        "48": "images/HCIprototype.png",
+        "128": "images/HCIprototype.png"
+      }
+    },
+    "icons": {
+      "16": "images/HCIprototype.png",
+      "48": "images/HCIprototype.png",
+      "128": "images/HCIprototype.png"
+    },
+    "permissions": ["storage"]
+  }
