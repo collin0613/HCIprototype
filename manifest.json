@@ -5,7 +5,6 @@
   "version": "1.0",
   "description": "Injects a student-centered GUI overlay into Outlook, providing customizable filters, priority inbox, and simplified navigation to streamline email management.",
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "images/HCIprototype.png",
       "48": "images/HCIprototype.png",
@@ -26,7 +25,7 @@
         "https://outlook.office.com/mail/*"
       ],
       "js": [
-        "content/popup.js"
+        "content/script.js"
       ],
       "css": [
         "content/styles.css"
