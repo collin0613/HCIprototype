@@ -17,49 +17,71 @@ function waitForSelector(selector, timeout = 10000) {
 	});
   }
   
-  // Main entry: inject filters as soon as the Outlook pivot bar is ready
+  // Main entry: inject filters in a full-width box above the message pane
   (async () => {
 	try {
-	  // 1) wait for the "Focused | Other" tablist to appear
-	  const tablist = await waitForSelector('div[role="tablist"]');
+	  // 1) wait for any pivot tab to load
+	  await waitForSelector('[role="tab"]', 15000);
   
-	  // 2) build our filter‐button container
+	  // 2) find the "Focused" tab by its visible text
+	  const tabElements = document.querySelectorAll('[role="tab"]');
+	  const focusedTab = Array.from(tabElements).find(tab => tab.textContent.trim() === 'Focused');
+	  if (!focusedTab) throw new Error("Couldn't find the 'Focused' pivot tab");
+  
+	  // 3) ensure message pane (role="main") is ready
+	  const mainPane = await waitForSelector('[role="main"]', 15000);
+  
+	  // 4) build our filter container
 	  const container = document.createElement('div');
 	  container.id = 'email-enhancer-filters';
-	  container.style.display = 'flex';
-	  container.style.margin = '12px 0';
-	  container.style.gap = '8px';
+	  Object.assign(container.style, {
+		display: 'flex',
+		gap: '12px',
+		width: '100%',
+		boxSizing: 'border-box',
+		padding: '8px 16px',
+		background: 'rgba(255, 255, 255, 0.98)',
+		borderBottom: '1px solid #ccc',
+		justifyContent: 'space-evenly',
+		zIndex: '1000'
+	  });
   
-	  // 3) define your four filters
+	  // 5) define our four filters with pastel colors
 	  const filters = [
-		{ name: 'Professors', fn: filterProfessors },
-		{ name: 'Announcements', fn: filterAnnouncements },
-		{ name: 'Promotions', fn: filterPromotions },
-		{ name: 'My Priority', fn: filterPriority }
+		{ name: 'Professors', fn: filterProfessors, color: '#e57373' },   // light red
+		{ name: 'Announcements', fn: filterAnnouncements, color: '#64b5f6' }, // light blue
+		{ name: 'Promotions', fn: filterPromotions, color: '#81c784' },     // light green
+		{ name: 'My Priority', fn: filterPriority, color: '#ffb74d' }       // light orange
 	  ];
   
-	  // 4) create buttons for each filter
-	  filters.forEach(({name, fn}, idx) => {
+	  // 6) create and append buttons
+	  filters.forEach((filter, idx) => {
 		const btn = document.createElement('button');
-		btn.textContent = name;
+		btn.textContent = filter.name;
 		btn.classList.add('ms-Button', 'ms-Button--command');
-		btn.style.flex = 'none';
+		// set background and text color
+		btn.style.backgroundColor = filter.color;
+		btn.style.color = 'white';
+		btn.style.border = 'none';
+		btn.style.flex = '1';
+		btn.style.padding = '8px 0';
+		btn.style.cursor = 'pointer';
+		btn.style.borderRadius = '6px';
+  
 		btn.addEventListener('click', () => {
 		  // clear previous active state
-		  container.querySelectorAll('.is-active')
-			.forEach(x => x.classList.remove('is-active'));
+		  container.querySelectorAll('.is-active').forEach(el => el.classList.remove('is-active'));
 		  btn.classList.add('is-active');
-		  applyFilter(fn);
+		  applyFilter(filter.fn);
 		});
-		// make the first one active by default
 		if (idx === 0) btn.classList.add('is-active');
 		container.appendChild(btn);
 	  });
   
-	  // 5) insert our container just above the Outlook pivot
-	  tablist.parentElement.insertBefore(container, tablist);
+	  // 7) insert our container at the top of the main pane, above the message toolbar
+	  mainPane.insertBefore(container, mainPane.firstElementChild);
   
-	  // 6) kick it off with the default filter
+	  // 8) apply default filter
 	  applyFilter(filters[0].fn);
   
 	} catch (err) {
@@ -69,7 +91,6 @@ function waitForSelector(selector, timeout = 10000) {
   
   // Applies a given filter function to every message row
   function applyFilter(criteriaFn) {
-	// each message item is a role="option" with aria-label
 	const rows = document.querySelectorAll('[role="option"][aria-label]');
 	rows.forEach(row => {
 	  const show = criteriaFn(row);
@@ -80,30 +101,26 @@ function waitForSelector(selector, timeout = 10000) {
   // Filter #1: Professors → show any email from your stevens.edu faculty
   function filterProfessors(row) {
 	const avatar = row.querySelector('.fui-Avatar');
-	const sender = avatar && avatar.getAttribute('aria-label') || '';
-	// adjust this pattern to match your professors’ addresses or names
+	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
 	return /@stevens\.edu$/i.test(sender);
   }
   
   // Filter #2: Announcements → show official “Office of…” or “Division of…” senders
   function filterAnnouncements(row) {
 	const avatar = row.querySelector('.fui-Avatar');
-	const sender = avatar && avatar.getAttribute('aria-label') || '';
+	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
 	return /Office|Division|Center|Research/i.test(sender);
   }
   
   // Filter #3: Promotions → show external, non-Stevens senders
   function filterPromotions(row) {
 	const avatar = row.querySelector('.fui-Avatar');
-	const sender = avatar && avatar.getAttribute('aria-label') || '';
-	// anything not coming from stevens.edu
+	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
 	return !/@stevens\.edu$/i.test(sender);
   }
   
   // Filter #4: My Priority → show flagged messages
   function filterPriority(row) {
-	// look for the flag button being “pressed”
 	const flagBtn = row.querySelector('button[title="Flag this message"]');
 	return flagBtn && flagBtn.getAttribute('aria-pressed') === 'true';
   }
-  
