@@ -76,42 +76,47 @@ function waitForSelector(sel, timeout = 10000) {
 			const date = doc.querySelector('OPFMessageCopyReceivedTime')?.textContent || '';
 			const fromElem = doc.querySelector('OPFMessageCopyFromAddresses emailAddress');
 			const from = fromElem?.getAttribute('OPFContactEmailAddressAddress')?.trim() || '';
-			emails.push({ from, subject, date });
+			const name = fromElem?.getAttribute('OPFContactEmailAddressName')?.trim() || '';
+			emails.push({ from, name, subject, date });
 		  }
 		}
 		return emails;
 	  }
   
-	  // 3e) Define filters with correct regex and no premature references
+	  // 3e) Define filters and icons
 	  const filters = [
 		{
 		  name: 'University/Faculty',
-		  fn: e => /@stevens\.edu\b/i.test(e.from),
-		  color: '#e57373'
+		  fn: e => /@stevens\.edu\b/i.test(e.from)
+					 && !/^(?:donotreply|ducklink|studentbelonging|racs|newspoints)@stevens\.edu$/i.test(e.from),
+		  color: '#e57373',
+		  icon: null // dynamic based on name
 		},
 		{
 		  name: 'Campus LMS',
 		  fn: e => /@instructure\.com\b/i.test(e.from),
-		  color: '#64b5f6'
+		  color: '#64b5f6',
+		  icon: '📢'
 		},
 		{
 		  name: 'Campus Events',
-		  fn: e => /@(?:engage\.)?academicimpressions\.com\b/i.test(e.from),
-		  color: '#81c784'
+		  fn: e => /^(?:donotreply|ducklink|studentbelonging|racs|newspoints)@stevens\.edu$/i.test(e.from)
+					|| /@(?:engage\.)?academicimpressions\.com\b/i.test(e.from),
+		  color: '#81c784',
+		  icon: '🗓️'
 		},
 		{
 		  name: 'External Resources',
-		  fn: e => !/@stevens\.edu\b/i.test(e.from)
-				   && !/@instructure\.com\b/i.test(e.from)
-				   && !/@(?:engage\.)?academicimpressions\.com\b/i.test(e.from),
-		  color: '#ffb74d'
+		  fn: e => !filters[0].fn(e) && !filters[1].fn(e) && !filters[2].fn(e),
+		  color: '#ffb74d',
+		  icon: '🔔'
 		}
 	  ];
   
 	  let allEmails = [];
   
-	  // 3f) Render list into outputDiv
-	  function render(list, color) {
+	  // 3f) Render list into outputDiv with emojis
+	  function render(list, filter, color) {
 		outputDiv.innerHTML = '';
 		outputDiv.style.background = lightenColor(color, 20);
 		if (!list.length) {
@@ -120,9 +125,20 @@ function waitForSelector(sel, timeout = 10000) {
 		  outputDiv.appendChild(msg);
 		  return;
 		}
+		const now = Date.now();
 		list.forEach(e => {
 		  const row = document.createElement('div');
-		  row.textContent = `[${e.from}] ${e.subject} — ${new Date(e.date).toLocaleString()}`;
+		  const dateMs = new Date(e.date).getTime();
+		  const isRecent = now - dateMs <= 24 * 60 * 60 * 1000;
+		  // Determine icon
+		  let icon = filter.icon;
+		  if (filter.name === 'University/Faculty') {
+			const words = e.name.split(/\s+/).filter(w => w);
+			icon = words.length === 2 ? '👤' : '🏫';
+		  }
+		  if (isRecent) row.style.fontWeight = 'bold';
+		  const text = `${icon} [${e.from}] ${e.name ? `(${e.name}) ` : ''}${e.subject} — ${new Date(e.date).toLocaleString()}`;
+		  row.textContent = text;
 		  Object.assign(row.style, { padding: '4px 0', borderBottom: '1px solid #ddd' });
 		  outputDiv.appendChild(row);
 		});
@@ -150,7 +166,7 @@ function waitForSelector(sel, timeout = 10000) {
 		  const matches = allEmails
 			.filter(f.fn)
 			.sort((a, b) => new Date(b.date) - new Date(a.date));
-		  render(matches, f.color);
+		  render(matches, f, f.color);
 		});
 		filterBar.appendChild(btn);
 		return btn;
