@@ -1,32 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "HCIprototype",
-  "author": "Vincent Cancelliere",
+  "name": "Email Enhancer (Local OLM)",
   "version": "1.0",
-  "description": "Injects a student-centered GUI overlay into Outlook, providing customizable filters, priority inbox, and simplified navigation to streamline email management.",
-  "action": {
-    "default_icon": {
-      "16": "images/HCIprototype.png",
-      "48": "images/HCIprototype.png",
-      "128": "images/HCIprototype.png"
-    }
-  },
+  "description": "Load an OLM file, then filter & categorize your Outlook emails locally.",
   "icons": {
-    "16": "images/HCIprototype.png",
-    "48": "images/HCIprototype.png",
-    "128": "images/HCIprototype.png"
+    "48": "images/HCIprototype.png"
   },
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
-    "https://outlook.office365.com/mail/*"
+    "https://outlook.office365.com/*", "https://outlook.office.com/mail/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://outlook.office365.com/mail/*"],
-      "js": ["content/script.js"],
+      "matches": ["https://outlook.office365.com/mail/*", "https://outlook.office.com/mail/*"],
+      "js": [
+        "lib/jszip.min.js",
+        "content/script.js"
+      ],
       "run_at": "document_idle"
     }
-  ],
-  "permissions": [
-    "storage"
   ]
 }

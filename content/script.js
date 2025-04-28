@@ -1,126 +1,175 @@
-// script.js
+// content/script.js
 
-// Utility: wait until a DOM selector matches something (up to timeout ms)
-function waitForSelector(selector, timeout = 10000) {
-	return new Promise((resolve, reject) => {
+// 1) Helper to wait for a selector
+function waitForSelector(sel, timeout = 10000) {
+	return new Promise((res, rej) => {
 	  const start = Date.now();
-	  const timer = setInterval(() => {
-		const el = document.querySelector(selector);
+	  const iv = setInterval(() => {
+		const el = document.querySelector(sel);
 		if (el) {
-		  clearInterval(timer);
-		  resolve(el);
+		  clearInterval(iv);
+		  res(el);
 		} else if (Date.now() - start > timeout) {
-		  clearInterval(timer);
-		  reject(`Timeout waiting for selector: ${selector}`);
+		  clearInterval(iv);
+		  rej(new Error(`Timeout waiting for ${sel}`));
 		}
 	  }, 200);
 	});
   }
   
-  // Main entry: inject filters in a full-width box above the message pane
+  // 2) Lighten hex color by pct (0–100)
+  function lightenColor(hex, pct) {
+	const num = parseInt(hex.replace('#', ''), 16);
+	const r = (num >> 16) & 0xFF;
+	const g = (num >> 8) & 0xFF;
+	const b = num & 0xFF;
+	const nr = Math.min(255, Math.round(r + (255 - r) * pct / 100));
+	const ng = Math.min(255, Math.round(g + (255 - g) * pct / 100));
+	const nb = Math.min(255, Math.round(b + (255 - b) * pct / 100));
+	return '#' + ((1 << 24) + (nr << 16) + (ng << 8) + nb).toString(16).slice(1);
+  }
+  
+  // 3) Main injection
   (async () => {
 	try {
-	  // 1) wait for any pivot tab to load
-	  await waitForSelector('[role="tab"]', 15000);
+	  // 3a) Wait for Outlook's main pane
+	  await waitForSelector('[role="tab"]');
+	  const mainPane = await waitForSelector('[role="main"]');
   
-	  // 2) find the "Focused" tab by its visible text
-	  const tabElements = document.querySelectorAll('[role="tab"]');
-	  const focusedTab = Array.from(tabElements).find(tab => tab.textContent.trim() === 'Focused');
-	  if (!focusedTab) throw new Error("Couldn't find the 'Focused' pivot tab");
+	  // 3b) Build file-input & Load button
+	  const fileInput = document.createElement('input');
+	  fileInput.type = 'file';
+	  fileInput.accept = '.olm,.zip';
+	  fileInput.style.display = 'none';
+	  document.body.appendChild(fileInput);
   
-	  // 3) ensure message pane (role="main") is ready
-	  const mainPane = await waitForSelector('[role="main"]', 15000);
-  
-	  // 4) build our filter container
-	  const container = document.createElement('div');
-	  container.id = 'email-enhancer-filters';
-	  Object.assign(container.style, {
+	  // 3c) Containers: filter bar + results
+	  const filterBar = document.createElement('div');
+	  filterBar.id = 'email-enhancer-filters';
+	  Object.assign(filterBar.style, {
 		display: 'flex',
-		gap: '12px',
-		width: '100%',
-		boxSizing: 'border-box',
-		padding: '8px 16px',
-		background: 'rgba(255, 255, 255, 0.98)',
-		borderBottom: '1px solid #ccc',
-		justifyContent: 'space-evenly',
-		zIndex: '1000'
+		gap: '8px',
+		padding: '8px',
+		background: '#fff',
+		borderBottom: '1px solid #ccc'
 	  });
   
-	  // 5) define our four filters with pastel colors
+	  const outputDiv = document.createElement('div');
+	  outputDiv.id = 'email-enhancer-output';
+	  Object.assign(outputDiv.style, {
+		padding: '8px',
+		background: '#fafafa',
+		maxHeight: '400px',
+		overflowY: 'auto'
+	  });
+  
+	  // 3d) Helper to parse the OLM via JSZip
+	  async function parseOlm(file) {
+		const blob = await file.arrayBuffer();
+		const zip = await JSZip.loadAsync(blob);
+		const emails = [];
+		for (const path of Object.keys(zip.files)) {
+		  if (path.includes('/com.microsoft.__Messages/Inbox/message_') && path.endsWith('.xml')) {
+			const xmlText = await zip.files[path].async('string');
+			const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+			const subject = doc.querySelector('OPFMessageCopyThreadTopic')?.textContent || '(no subject)';
+			const date = doc.querySelector('OPFMessageCopyReceivedTime')?.textContent || '';
+			const fromElem = doc.querySelector('OPFMessageCopyFromAddresses emailAddress');
+			const from = fromElem?.getAttribute('OPFContactEmailAddressAddress')?.trim() || '';
+			emails.push({ from, subject, date });
+		  }
+		}
+		return emails;
+	  }
+  
+	  // 3e) Define filters with correct regex and no premature references
 	  const filters = [
-		{ name: 'Professors', fn: filterProfessors, color: '#e57373' },   // light red
-		{ name: 'Announcements', fn: filterAnnouncements, color: '#64b5f6' }, // light blue
-		{ name: 'Promotions', fn: filterPromotions, color: '#81c784' },     // light green
-		{ name: 'My Priority', fn: filterPriority, color: '#ffb74d' }       // light orange
+		{
+		  name: 'University/Faculty',
+		  fn: e => /@stevens\.edu\b/i.test(e.from),
+		  color: '#e57373'
+		},
+		{
+		  name: 'Campus LMS',
+		  fn: e => /@instructure\.com\b/i.test(e.from),
+		  color: '#64b5f6'
+		},
+		{
+		  name: 'Campus Events',
+		  fn: e => /@(?:engage\.)?academicimpressions\.com\b/i.test(e.from),
+		  color: '#81c784'
+		},
+		{
+		  name: 'External Resources',
+		  fn: e => !/@stevens\.edu\b/i.test(e.from)
+				   && !/@instructure\.com\b/i.test(e.from)
+				   && !/@(?:engage\.)?academicimpressions\.com\b/i.test(e.from),
+		  color: '#ffb74d'
+		}
 	  ];
   
-	  // 6) create and append buttons
-	  filters.forEach((filter, idx) => {
-		const btn = document.createElement('button');
-		btn.textContent = filter.name;
-		btn.classList.add('ms-Button', 'ms-Button--command');
-		// set background and text color
-		btn.style.backgroundColor = filter.color;
-		btn.style.color = 'white';
-		btn.style.border = 'none';
-		btn.style.flex = '1';
-		btn.style.padding = '8px 0';
-		btn.style.cursor = 'pointer';
-		btn.style.borderRadius = '6px';
+	  let allEmails = [];
   
-		btn.addEventListener('click', () => {
-		  // clear previous active state
-		  container.querySelectorAll('.is-active').forEach(el => el.classList.remove('is-active'));
-		  btn.classList.add('is-active');
-		  applyFilter(filter.fn);
+	  // 3f) Render list into outputDiv
+	  function render(list, color) {
+		outputDiv.innerHTML = '';
+		outputDiv.style.background = lightenColor(color, 20);
+		if (!list.length) {
+		  const msg = document.createElement('div');
+		  msg.textContent = 'No messages in this category.';
+		  outputDiv.appendChild(msg);
+		  return;
+		}
+		list.forEach(e => {
+		  const row = document.createElement('div');
+		  row.textContent = `[${e.from}] ${e.subject} — ${new Date(e.date).toLocaleString()}`;
+		  Object.assign(row.style, { padding: '4px 0', borderBottom: '1px solid #ddd' });
+		  outputDiv.appendChild(row);
 		});
-		if (idx === 0) btn.classList.add('is-active');
-		container.appendChild(btn);
+	  }
+  
+	  // 3g) Load button
+	  const loadBtn = document.createElement('button');
+	  loadBtn.textContent = '📂 Load OLM…';
+	  Object.assign(loadBtn.style, { flex: '0 0 auto', padding: '8px', cursor: 'pointer' });
+	  loadBtn.addEventListener('click', () => fileInput.click());
+	  filterBar.appendChild(loadBtn);
+  
+	  // 3h) Create filter buttons
+	  const filterButtons = filters.map((f, idx) => {
+		const btn = document.createElement('button');
+		btn.textContent = f.name;
+		Object.assign(btn.style, {
+		  flex: '1', padding: '8px', background: f.color,
+		  color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', opacity: '0.5'
+		});
+		btn.disabled = true;
+		btn.addEventListener('click', () => {
+		  filterButtons.forEach(b => b.style.opacity = '0.5');
+		  btn.style.opacity = '1';
+		  const matches = allEmails
+			.filter(f.fn)
+			.sort((a, b) => new Date(b.date) - new Date(a.date));
+		  render(matches, f.color);
+		});
+		filterBar.appendChild(btn);
+		return btn;
 	  });
   
-	  // 7) insert our container at the top of the main pane, above the message toolbar
-	  mainPane.insertBefore(container, mainPane.firstElementChild);
+	  // 3i) File selection handling
+	  fileInput.addEventListener('change', async () => {
+		if (!fileInput.files.length) return;
+		allEmails = await parseOlm(fileInput.files[0]);
+		filterButtons.forEach(btn => { btn.disabled = false; btn.style.opacity = '0.5'; });
+		filterButtons[0].click();
+	  });
   
-	  // 8) apply default filter
-	  applyFilter(filters[0].fn);
+	  // 3j) Inject UI into page
+	  mainPane.insertBefore(filterBar, mainPane.firstElementChild);
+	  mainPane.insertBefore(outputDiv, filterBar.nextSibling);
   
-	} catch (err) {
-	  console.error('Email Enhancer:', err);
+	} catch (e) {
+	  console.error('Email Enhancer:', e);
 	}
   })();
   
-  // Applies a given filter function to every message row
-  function applyFilter(criteriaFn) {
-	const rows = document.querySelectorAll('[role="option"][aria-label]');
-	rows.forEach(row => {
-	  const show = criteriaFn(row);
-	  row.style.display = show ? '' : 'none';
-	});
-  }
-  
-  // Filter #1: Professors → show any email from your stevens.edu faculty
-  function filterProfessors(row) {
-	const avatar = row.querySelector('.fui-Avatar');
-	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
-	return /@stevens\.edu$/i.test(sender);
-  }
-  
-  // Filter #2: Announcements → show official “Office of…” or “Division of…” senders
-  function filterAnnouncements(row) {
-	const avatar = row.querySelector('.fui-Avatar');
-	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
-	return /Office|Division|Center|Research/i.test(sender);
-  }
-  
-  // Filter #3: Promotions → show external, non-Stevens senders
-  function filterPromotions(row) {
-	const avatar = row.querySelector('.fui-Avatar');
-	const sender = (avatar && avatar.getAttribute('aria-label')) || '';
-	return !/@stevens\.edu$/i.test(sender);
-  }
-  
-  // Filter #4: My Priority → show flagged messages
-  function filterPriority(row) {
-	const flagBtn = row.querySelector('button[title="Flag this message"]');
-	return flagBtn && flagBtn.getAttribute('aria-pressed') === 'true';
-  }
