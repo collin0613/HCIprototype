@@ -40,6 +40,28 @@ HCIprototype/
 
 These measures combine objective performance metrics with subjective user feedback to evaluate both the effectiveness and user experience of our design.
 
+## Setup & Installation
+
+### Clone the repository
+
+Open your terminal or command prompt and run:
+```bash
+git clone https://github.com/collin0613/HCIprototype.git
+cd HCIprototype
+```
+
+(Replace the URL above with the actual repository URL.)
+
+### Load the unpacked extension in Chrome
+
+1. Launch Google Chrome and navigate to `chrome://extensions`.
+2. Enable **Developer mode** (toggle in the top-right).
+3. Click **Load unpacked**.
+4. In the file dialog, select the cloned `HCIprototype/` directory.
+5. Ensure the **Email Enhancer (Local OLM)** extension is enabled.
+
+Now you’re ready to use the extension on your Outlook Web client!
+
 ## Email Export Instructions
 
 To analyze your full inbox locally, first export your emails from Outlook into an archive file:
