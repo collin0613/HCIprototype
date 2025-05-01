@@ -13,9 +13,7 @@ HCIprototype/
 │   ├── script.js           # Content script with UI & parsing logic
 │   └── styles.css          # Styles for injected UI
 ├── icons/
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
+│   ├── HCIPrototype.png
 └── README.md               # This documentation file
 ```
 
@@ -42,3 +40,28 @@ HCIprototype/
 
 These measures combine objective performance metrics with subjective user feedback to evaluate both the effectiveness and user experience of our design.
 
+## Email Export Instructions
+
+To analyze your full inbox locally, first export your emails from Outlook into an archive file:
+
+### Outlook for Mac (Legacy client)
+1. Open the **Outlook for Mac** application (disable “New Outlook” if needed by toggling the switch in the top-right corner).  
+2. In the macOS menu bar, click **File → Export…**.  
+3. In the dialog, choose **“Outlook for Mac Data File (.olm)”**.  
+4. Check only **Mail** (and if available, select **Inbox**).  
+5. Click **Continue**, choose a save location (e.g. `inbox_export.olm`), and wait for completion.
+
+### Outlook for Windows (Desktop client)
+1. Open **Outlook for Windows**.  
+2. Go to **File → Open & Export → Import/Export**.  
+3. Select **“Export to a file”**, click **Next**.  
+4. Choose **“Outlook Data File (.pst)”**, click **Next**.  
+5. Select your **Inbox** folder (and subfolders if desired), click **Next**.  
+6. Browse to save as e.g. `inbox_export.pst`, finish the export.
+
+> **Alternative CSV export (Windows only):**  
+> - In the Import/Export wizard choose **“Comma Separated Values”** instead of PST.  
+> - Select **Inbox**, save as `inbox_export.csv`.  
+> - This yields a CSV of Subject, From, Date, etc., which can also be parsed by the extension.
+
+Once you have your `.olm`, `.pst`, or `.csv` file, click **📂 Load OLM…** in the extension UI to parse and begin filtering your messages.
