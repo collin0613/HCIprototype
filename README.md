@@ -44,13 +44,10 @@ These measures combine objective performance metrics with subjective user feedba
 
 ### Clone the repository
 
-Open your terminal or command prompt and run:
+Open your terminal or command prompt, and then locate the directory you would like for the extension to be downloaded to.  Then:
 ```bash
 git clone https://github.com/collin0613/HCIprototype.git
-cd HCIprototype
 ```
-
-(Replace the URL above with the actual repository URL.)
 
 ### Load the unpacked extension in Chrome
 
